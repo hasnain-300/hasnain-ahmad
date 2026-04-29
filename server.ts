@@ -58,8 +58,12 @@ const getEmailConfig = () => {
 const getTransporter = () => {
   const { user, pass } = getEmailConfig();
   return nodemailer.createTransport({
-    service: 'gmail',
-    auth: { user, pass }
+    host: 'smtp.gmail.com',
+    port: 465,
+    secure: true,
+    auth: { user, pass },
+    // Force IPv4 as some environments (like Render) fail with ENETUNREACH on IPv6
+    family: 4
   });
 };
 
@@ -344,10 +348,19 @@ app.post('/api/auth/login-request', adminSecretCheck, async (req, res) => {
       } catch (mailErr: any) {
         console.error('OTP Mail error:', mailErr);
         let errorMessage = 'Security system failure: Unable to send verification email. Please verify SMTP settings.';
+        
         if (mailErr.message && mailErr.message.includes('535')) {
-          errorMessage = 'MFA Authentication Failed (Error 535). Please verify your Gmail App Password in Secrets.';
+          errorMessage = 'SMTP Auth Failed (Error 535). Please verify your Gmail App Password in Render Environment Variables.';
+        } else if (mailErr.code === 'EENVELOPE') {
+          errorMessage = 'SMTP Error: Invalid sender or recipient address.';
+        } else if (mailErr.code === 'ETIMEDOUT') {
+          errorMessage = 'SMTP Error: Connection timed out. Please check if port 465/587 is allowed or use a different service.';
         }
-        res.status(500).json({ message: errorMessage });
+        
+        res.status(500).json({ 
+          message: errorMessage,
+          hint: 'Check your Render dashboard logs for more details.'
+        });
       }
     } else {
       res.status(500).json({ message: 'Security system offline: Email service not configured.' });
