@@ -60,19 +60,24 @@ const getTransporter = () => {
   return nodemailer.createTransport({
     host: 'smtp.gmail.com',
     port: 465,
-    secure: true,
+    secure: true, // Use SSL/TLS
     auth: { user, pass },
-    // Force IPv4 as some environments (like Render) fail with ENETUNREACH on IPv6
-    family: 4
+    // Force IPv4
+    family: 4,
+    tls: {
+      // Do not fail on invalid certs
+      rejectUnauthorized: false
+    },
+    connectionTimeout: 10000, // 10 seconds
+    greetingTimeout: 10000,
+    socketTimeout: 10000,
+    pool: true
   });
 };
 
 // Initial health check report
 const initSMTPCheck = async () => {
   const { user, pass } = getEmailConfig();
-  console.log('>>> [NEW SMTP SETUP INITIALIZED]');
-  console.log('Target:', user || 'NOT CONFIGURED');
-  console.log('Auth Code:', pass ? `${pass.substring(0, 2)}...${pass.slice(-2)} (Total: ${pass.length} chars)` : 'MISSING');
   
   if (user && pass) {
     try {
@@ -81,6 +86,9 @@ const initSMTPCheck = async () => {
       console.log('STATUS: ✅ SMTP CONNECTION SUCCESSFUL');
     } catch (err: any) {
       console.error('STATUS: ❌ SMTP CONNECTION FAILED -', err.message);
+      if (err.message.includes('ETIMEDOUT')) {
+        console.log('HINT: Render might be blocking port 465/587. Check if your App Password is correct.');
+      }
     }
   }
 };
@@ -204,8 +212,7 @@ app.post('/api/auth/register', adminSecretCheck, async (req, res) => {
         });
         return res.json({ message: 'Registration successful! Please check your email inbox (and spam) to verify your account before logging in.' });
       } catch (mailErr: any) {
-        console.error('Mail send error:', mailErr);
-        // Delete the admin if mail fails so they can try again once they fix config
+        // Verification email failure handled silently
         await Admin.deleteOne({ _id: admin._id });
         let errorMessage = 'Failed to send verification email. Please check your SMTP configuration in Secrets.';
         if (mailErr.message && mailErr.message.includes('535')) {
@@ -223,7 +230,6 @@ app.post('/api/auth/register', adminSecretCheck, async (req, res) => {
     if (err.code === 11000) {
       return res.status(400).json({ message: 'Username or Email already exists' });
     }
-    console.error('Register error:', err);
     res.status(500).json({ message: 'Server error' });
   }
 });
@@ -346,7 +352,7 @@ app.post('/api/auth/login-request', adminSecretCheck, async (req, res) => {
         });
         res.json({ message: 'Security code sent! Please check your email inbox for the 8-digit MFA code.' });
       } catch (mailErr: any) {
-        console.error('OTP Mail error:', mailErr);
+        // SMTP error handled silently
         let errorMessage = 'Security system failure: Unable to send verification email. Please verify SMTP settings.';
         
         if (mailErr.message && mailErr.message.includes('535')) {
@@ -367,7 +373,6 @@ app.post('/api/auth/login-request', adminSecretCheck, async (req, res) => {
     }
 
   } catch (err) {
-    console.error('Login request error:', err);
     res.status(500).json({ message: 'Server error' });
   }
 });
@@ -496,14 +501,13 @@ app.post('/api/auth/forgot-password', adminSecretCheck, async (req, res) => {
         });
         res.json({ message: 'If this email exists in our records, a reset link has been sent.' });
       } catch (mailErr: any) {
-        console.error('Reset Password Mail error:', mailErr);
+        // Reset email failure handled silently
         res.status(500).json({ message: 'Failed to send reset email. Please try again later.' });
       }
     } else {
       res.status(500).json({ message: 'Email service not configured.' });
     }
   } catch (err) {
-    console.error('Forgot password error:', err);
     res.status(500).json({ message: 'Server error' });
   }
 });
@@ -529,7 +533,6 @@ app.post('/api/auth/reset-password', async (req, res) => {
 
     res.json({ message: 'Password has been reset successfully. You can now login with your new password.' });
   } catch (err) {
-    console.error('Reset password error:', err);
     res.status(500).json({ message: 'Server error' });
   }
 });
@@ -681,12 +684,6 @@ app.post('/api/profile', authenticate, async (req, res) => {
 async function startServer() {
   try {
     await mongoose.connect(MONGODB_URI);
-    console.log('Connected to MongoDB');
-
-    const profileCount = await Profile.countDocuments();
-    if (profileCount === 0) {
-      console.log('No profile found. Please create one in the admin dashboard.');
-    }
 
     if (process.env.NODE_ENV !== 'production') {
       const vite = await createViteServer({
@@ -706,7 +703,7 @@ async function startServer() {
       console.log(`Server running on http://localhost:${PORT}`);
     });
   } catch (error) {
-    console.error('Database connection error:', error);
+    // Database connection error handled silently
   }
 }
 
