@@ -211,12 +211,6 @@ export default function Portfolio() {
       <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-8 text-center">
         <h1 className="text-4xl font-bold text-white mb-4">Welcome to Your Portfolio</h1>
         <p className="text-slate-400 mb-8">It looks like you haven't set up your content yet.</p>
-        <button 
-          onClick={() => navigate(`/admin/login/${import.meta.env.VITE_ADMIN_ACCESS_SECRET}`)}
-          className="px-8 py-3 bg-purple-600 text-white font-bold rounded-xl hover:bg-purple-500 transition-all"
-        >
-          Go to Admin Dashboard
-        </button>
       </div>
     );
   }

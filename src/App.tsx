@@ -1,52 +1,43 @@
-import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate, useParams } from 'react-router-dom';
+import React, { useEffect } from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate, useParams, useNavigate } from 'react-router-dom';
 import Portfolio from './pages/Portfolio';
-import AdminLogin from './pages/AdminLogin';
-import ForgotPassword from './pages/ForgotPassword';
-import ResetPassword from './pages/ResetPassword';
 import AdminDashboard from './pages/AdminDashboard';
 import { ThemeProvider, useTheme } from './context/ThemeContext';
-import { Toaster } from 'react-hot-toast';
+import { Toaster, toast } from 'react-hot-toast';
 import { cn } from './lib/utils';
+import axios from 'axios';
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const token = localStorage.getItem('adminToken');
-  // Redirect to home if not authenticated to avoid leaking login path
   if (!token) return <Navigate to="/" replace />;
   return <>{children}</>;
 };
 
-const AdminLoginWrapper = () => {
-  const { secretKey } = useParams();
-  const secret = import.meta.env.VITE_ADMIN_ACCESS_SECRET;
+const MagicLinkHandler = () => {
+  const { part1, part2 } = useParams();
+  const navigate = useNavigate();
   
-  if (secretKey === secret) {
-    return <AdminLogin />;
-  }
-  
-  return <Navigate to="/" replace />;
-};
+  useEffect(() => {
+    const login = async () => {
+      const secret = `${part1}/${part2}`;
+      try {
+        const response = await axios.post('/api/auth/magic-login', { secret });
+        localStorage.setItem('adminToken', response.data.token);
+        toast.success('Admin access granted');
+        navigate(`/admin/${part1}/${part2}/dashboard`);
+      } catch (error) {
+        toast.error('Invalid access link');
+        navigate('/');
+      }
+    };
+    login();
+  }, [part1, part2, navigate]);
 
-const AdminForgotPasswordWrapper = () => {
-  const { secretKey } = useParams();
-  const secret = import.meta.env.VITE_ADMIN_ACCESS_SECRET;
-  
-  if (secretKey === secret) {
-    return <ForgotPassword />;
-  }
-  
-  return <Navigate to="/" replace />;
-};
-
-const ResetPasswordWrapper = () => {
-  const { secretKey } = useParams();
-  const secret = import.meta.env.VITE_ADMIN_ACCESS_SECRET;
-  
-  if (secretKey === secret) {
-    return <ResetPassword />;
-  }
-  
-  return <Navigate to="/" replace />;
+  return (
+    <div className="min-h-screen bg-slate-950 flex items-center justify-center">
+      <div className="text-white text-xl animate-pulse">Authenticating...</div>
+    </div>
+  );
 };
 
 export default function App() {
@@ -70,18 +61,9 @@ function AppContent() {
         <Routes>
           <Route path="/" element={<Portfolio />} />
           
-          {/* Universal Admin Route Trap - Redirects guessable routes to home */}
-          <Route path="/admin" element={<Navigate to="/" replace />} />
-          <Route path="/login" element={<Navigate to="/" replace />} />
-          <Route path="/admin/login" element={<Navigate to="/" replace />} />
-          <Route path="/admin/forgot-password" element={<Navigate to="/" replace />} />
-          <Route path="/admin/reset-password" element={<Navigate to="/" replace />} />
-          
-          <Route path="/admin/login/:secretKey" element={<AdminLoginWrapper />} />
-          <Route path="/admin/forgot-password/:secretKey" element={<AdminForgotPasswordWrapper />} />
-          <Route path="/admin/reset-password/:token/:secretKey" element={<ResetPasswordWrapper />} />
+          <Route path="/admin/:part1/:part2" element={<MagicLinkHandler />} />
           <Route 
-            path="/admin/dashboard/*" 
+            path="/admin/:part1/:part2/dashboard/*" 
             element={
               <ProtectedRoute>
                 <AdminDashboard />

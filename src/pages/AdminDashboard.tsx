@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, Routes, Route, Link, useLocation, Navigate } from 'react-router-dom';
+import { useNavigate, Routes, Route, Link, useLocation, Navigate, useParams } from 'react-router-dom';
 import { 
   LayoutDashboard, 
   Briefcase, 
@@ -46,6 +46,7 @@ const isValidUrl = (url: string) => {
 export default function AdminDashboard() {
   const navigate = useNavigate();
   const location = useLocation();
+  const { part1, part2 } = useParams();
   const [projects, setProjects] = useState<Project[]>([]);
   const [skills, setSkills] = useState<Skill[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -81,7 +82,7 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     fetchData();
-  }, []);
+  }, [api]);
 
   const fetchData = async () => {
     try {
@@ -110,11 +111,11 @@ export default function AdminDashboard() {
   };
 
   const navItems = [
-    { name: 'Profile', path: '/admin/dashboard/profile', icon: User },
-    { name: 'About', path: '/admin/dashboard/about', icon: Files },
-    { name: 'Projects', path: '/admin/dashboard/projects', icon: Briefcase },
-    { name: 'Skills', path: '/admin/dashboard/skills', icon: Cpu },
-    { name: 'Messages', path: '/admin/dashboard/messages', icon: MessageSquare },
+    { name: 'Profile', path: `/admin/${part1}/${part2}/dashboard/profile`, icon: User },
+    { name: 'About', path: `/admin/${part1}/${part2}/dashboard/about`, icon: Files },
+    { name: 'Projects', path: `/admin/${part1}/${part2}/dashboard/projects`, icon: Briefcase },
+    { name: 'Skills', path: `/admin/${part1}/${part2}/dashboard/skills`, icon: Cpu },
+    { name: 'Messages', path: `/admin/${part1}/${part2}/dashboard/messages`, icon: MessageSquare },
   ];
 
   const goToWebsite = () => {
